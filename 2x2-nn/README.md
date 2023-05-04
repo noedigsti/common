@@ -13,13 +13,13 @@ Features:
 
 The model is able to achieve ~92% accuracy on the training set and a bit higher ~93% on the validation set. _Newly trained models may vary in performance_ but are able to consistently achieve >89% accuracy. The trained model is saved as [model.h5](./model.h5) and can be used to make predictions on new images.
 
-![black](../images/black.png)
-![white](../images/white.png)
-![uniform](../images/uniform.png)
-![horizontal](../images/horizontal.png)
-![vertical](../images/vertical.png)
-![diagonal](../images/diagonal.png)
-![other](../images/other.png)
+![black](./images/black.png)
+![white](./images/white.png)
+![uniform](./images/uniform.png)
+![horizontal](./images/horizontal.png)
+![vertical](./images/vertical.png)
+![diagonal](./images/diagonal.png)
+![other](./images/other.png)
 
 
 ## Usage
