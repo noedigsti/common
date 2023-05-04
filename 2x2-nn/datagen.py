@@ -1,9 +1,10 @@
 import os
 import h5py
 import numpy as np
+from sklearn.utils import shuffle
 
 
-def create_2x2_dataset(size=700):
+def create_2x2_dataset(size=21000):
     assert size % 7 == 0, "Size should be a multiple of 7 for a balanced dataset"
     num_samples_per_class = size // 7
 
@@ -104,13 +105,15 @@ def create_2x2_dataset(size=700):
         images.append(img)
         labels.append("Other")
 
-    images = np.array(images)
+    images, labels = np.array(images), np.array(labels)
+    images, labels = shuffle(images, labels, random_state=42)
     return images, labels
 
 
 # Create dataset
 images, labels = create_2x2_dataset()
-images = images / 255.0
+print(f"Images shape: {images.shape}")  # (7000, 2, 2)
+images = images.astype(np.float32) / 255.0
 images = np.expand_dims(images, axis=-1)
 
 
@@ -119,7 +122,12 @@ def save_dataset(images, labels, filename="2x2_dataset.h5"):
     filename = os.path.join(os.path.dirname(__file__), filename)
     with h5py.File(filename, "w") as f:
         f.create_dataset("images", data=images)
-        f.create_dataset("labels", data=labels)
+        string_dt = h5py.string_dtype(
+            encoding="utf-8", length=10
+        )  # Create a fixed-length string dtype
+        f.create_dataset(
+            "labels", data=[label.encode("utf-8") for label in labels], dtype=string_dt
+        )  # Save labels as fixed-length byte strings
 
 
 save_dataset(images, labels)
