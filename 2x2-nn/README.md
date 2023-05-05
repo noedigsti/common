@@ -3,11 +3,13 @@
 using TensorFlow, that learns to classify 2x2 grayscale images and predict whether the image is one of (7) classes: black, white, uniform, horizontal, vertical, diagonal, or other. The model is trained on a dataset of (N=21000) 2x2 grayscale images that are custom generated from the [datagen.py](./datagen.py).
 
 Features:
-- [x] Input layer, that is a convolutional (2D) layer with 16 filters, kernel size of 2x2, and ReLU activation
+- [x] Convolutional (2D) layer with 16 filters, kernel size of 2x2, and ReLU activation
 - [x] A flatten layer
-- [x] Two dense layers with 32 neurons and ReLU activation
+- [x] Dense layer with 32 neurons and ReLU activation
+- [x] Dense layer with 32 neurons and ReLU activation
 - [x] A dropout layer with a dropout rate of 0.3
 - [x] Output layer with 7 neurons and softmax activation
+- [x] A very small amount of ~1900 parameters
 
 ## Results
 
