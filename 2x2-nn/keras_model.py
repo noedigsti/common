@@ -73,4 +73,4 @@ model.fit(
 # Evaluate the model
 _, test_accuracy = model.evaluate(X_test, y_test)
 print(f"Test accuracy: {test_accuracy:.4f}")
-model.save("2x2_cnn.h5")  # Save the model
+model.save("./output/keras_trained.h5")  # Save the model

@@ -2,8 +2,9 @@ import os
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from sklearn.preprocessing import LabelEncoder
-from tensorflow.python.keras.models import load_model
+from torch_model import CNN
 
 
 def load_dataset(filename="2x2_dataset.h5"):
@@ -16,11 +17,11 @@ def load_dataset(filename="2x2_dataset.h5"):
 
 def predict_label(sample_image, loaded_model, label_encoder):
     sample_image = np.expand_dims(sample_image, axis=0)
-    predicted_probs = loaded_model.predict(sample_image)
-
-    predicted_class = np.argmax(predicted_probs)
-    predicted_label = label_encoder.inverse_transform([predicted_class])[0]
-
+    sample_image = torch.from_numpy(sample_image).transpose(1, 3).to(device)
+    with torch.no_grad():
+        predicted_probs = loaded_model(sample_image)
+    predicted_class = torch.argmax(predicted_probs)
+    predicted_label = label_encoder.inverse_transform([predicted_class.item()])[0]
     return predicted_label
 
 
@@ -31,11 +32,15 @@ def display_image_and_labels(images, true_label, predicted_label, index):
     plt.show()
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Device: {device}")
+
 images, labels = load_dataset()
 label_encoder = LabelEncoder().fit(labels)
-loaded_model = load_model(
-    "test_95_percentile_2x2_cnn.h5"
-)  # Change this to the path of your model
+loaded_model = CNN().to(device)
+loaded_model.load_state_dict(torch.load("./output/torch_trained.pth"))
+loaded_model.eval()
+
 index = 0
 
 while True:

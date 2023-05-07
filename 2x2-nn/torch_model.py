@@ -1,65 +1,25 @@
-from datetime import datetime
+import os
+import h5py
+import numpy as np
+import wandb
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset, random_split
-from torch.utils.tensorboard import SummaryWriter
-import h5py
-
-
-def label_encoder(labels):
-    unique_labels = sorted(set(labels))
-    label_to_index = {label: idx for idx, label in enumerate(unique_labels)}
-    encoded_labels = [label_to_index[label] for label in labels]
-    return encoded_labels
-
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Device:", device)
+print(f"Device: {device}")
 
 
-# Load dataset from an HDF5 file
 def load_dataset(filename="2x2_dataset.h5"):
-    with h5py.File(filename, "r") as f:
+    file_path = os.path.join(os.path.dirname(__file__), filename)
+    with h5py.File(file_path, "r") as f:
         images = f["images"][:]
-        labels = f["labels"][:]
+        labels = [label.decode("utf-8") for label in f["labels"][:]]
     return images, labels
 
 
-class CustomDataset(Dataset):
-    def __init__(self, images, labels):
-        self.images = images
-        self.labels = labels
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, index):
-        return self.images[index], self.labels[index]
-
-
-# Load dataset
-images, labels = load_dataset()
-print(f"images.shape: {images.shape}")  # (num_images, 2, 2, 1)
-
-# Preprocess the dataset
-X = torch.tensor(images, dtype=torch.float32).permute(0, 3, 1, 2).to(device)
-y = torch.tensor(label_encoder(labels), dtype=torch.long).to(device)
-
-# Create a custom dataset
-dataset = CustomDataset(X, y)
-
-# Split the dataset into train and test sets
-train_size = int(0.8 * len(dataset))
-test_size = len(dataset) - train_size
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
-
-# Create DataLoaders
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-
-
-# Define the CNN architecture
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
@@ -72,60 +32,59 @@ class CNN(nn.Module):
         self.fc3 = nn.Linear(32, 7)
 
     def forward(self, x):
-        x = self.relu(self.conv1(x))
+        x = self.conv1(x)
+        x = self.relu(x)
         x = self.flatten(x)
-        x = self.relu(self.fc1(x))
-        x = self.relu(self.fc2(x))
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.relu(x)
         x = self.dropout(x)
         x = self.fc3(x)
         return x
 
 
-model = CNN().to(device)
+def train_model(model, images, labels, num_epochs=15000, learning_rate=1e-3):
+    wandb.init(
+        mode="offline",
+        project="2x2-nn",
+        config={"num_epochs": num_epochs, "learning_rate": learning_rate},
+    )
+    label_encoder = LabelEncoder()
+    labels_encoded = label_encoder.fit_transform(labels)
+    print(f"Image shape: {images.shape}")
+    print(f"Labels shape: {labels_encoded.shape}")
+    print("Unique labels:", np.unique(labels_encoded))
+    print("Number of classes:", len(np.unique(labels_encoded)))
 
-# Define the optimizer and loss function
-optimizer = optim.Adam(model.parameters(), lr=0.004 - 0.00036)
-criterion = nn.CrossEntropyLoss()
+    X_train, X_test, y_train, y_test = train_test_split(
+        images, labels_encoded, test_size=0.2, random_state=42
+    )
+    X_train, X_test = X_train.astype(np.float32), X_test.astype(np.float32)
 
-logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-tensorboard_writer = SummaryWriter(log_dir=logdir)
+    X_train = torch.from_numpy(X_train).transpose(1, 3).to(device)
+    X_test = torch.from_numpy(X_test).transpose(1, 3).to(device)
+    y_train = torch.from_numpy(y_train).to(device)
+    y_test = torch.from_numpy(y_test).to(device)
 
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-6)
 
-# Train the model
-num_epochs = 150
+    for epoch in range(num_epochs):
+        outputs = model(X_train)
+        loss = criterion(outputs, y_train)
 
-for epoch in range(num_epochs):
-    model.train()
-    for i, (images, labels) in enumerate(train_loader):
-        images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
-
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-
         loss.backward()
         optimizer.step()
 
-    # Calculate the accuracy for the current epoch
-    model.eval()
-    correct = 0
-    total = 0
-    for images, labels in test_loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
-        _, predicted = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+        if (epoch + 1) % 1000 == 0:
+            _, predicted = torch.max(outputs, 1)
+            correct = (predicted == y_train).sum().item()
+            accuracy = correct / y_train.size(0) * 100
+            print(
+                f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}, Accuracy: {accuracy:.2f}%"
+            )
+            wandb.log({"Loss": loss.item(), "Accuracy": accuracy})
 
-    accuracy = 100 * correct / total
-
-    print(
-        f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}, Accuracy: {accuracy:.2f}%"
-    )
-
-    # Log the loss and accuracy for the current epoch
-    tensorboard_writer.add_scalar("Loss", loss.item(), epoch)
-    tensorboard_writer.add_scalar("Accuracy", accuracy, epoch)
-
-# Save the model
-torch.save(model.state_dict(), "2x2_cnn.pth")
+    return model
