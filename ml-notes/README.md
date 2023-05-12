@@ -75,7 +75,3 @@
 # Training
 
 [NVIDIA/Megatron-LM: Ongoing research training transformer models at scale](https://github.com/NVIDIA/Megatron-LM#collecting-gpt-webtext-data)
-
-python -c 'import os; os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"; import logging; logging.getLogger("tensorflow").setLevel(logging.ERROR); import tensorflow as tf; print(tf.test.is_gpu_available())'
-
-python -c 'import os; os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"; import tensorflow as tf; tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR); print(tf.config.list_physical_devices("GPU"));'
