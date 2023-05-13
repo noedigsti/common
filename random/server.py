@@ -1,11 +1,10 @@
-from collections import deque
-import concurrent.futures
-import socket
 import time
-import threading
+import socket
+import concurrent.futures
+from queue import Queue
+from threading import Event
 import torch
 import torch.nn as nn
-import queue
 
 
 class SimpleRNN(nn.Module):
@@ -24,7 +23,9 @@ class SimpleRNN(nn.Module):
         return torch.zeros(1, batch_size, self.hidden_size)
 
 
-def run_model_and_print_output(model, hidden, input_queue, continue_running):
+def run_model_and_print_output(
+    model, hidden: torch.Tensor, input_queue: Queue, continue_running: Event
+):
     try:
         last_input_time = time.time()
 
@@ -59,7 +60,24 @@ def run_model_and_print_output(model, hidden, input_queue, continue_running):
         print(f"Exception in run_model_and_print_output: {e}")
 
 
-def receive_input(c, input_queue, continue_running, active_connections):
+def receive_input(
+    c: socket, input_queue: Queue, continue_running: Event, active_connections: set
+):
+    """
+    Receives input from a client connection and handles it.
+
+    Args:
+        `c` (socket): The client's socket object.
+
+        `input_queue` (Queue): Queue to store user inputs.
+
+        `continue_running` (Event): Event to control the server running state.
+
+        `active_connections` (set): Set of active client connections.
+
+    Returns:
+        None
+    """
     try:
         while continue_running.is_set():
             user_input = c.recv(1024).decode()
@@ -83,7 +101,25 @@ def receive_input(c, input_queue, continue_running, active_connections):
         active_connections.remove(c)
 
 
-def handle_client(c, input_queue, continue_running, active_connections):
+def handle_client(
+    c: socket, input_queue: Queue, continue_running: Event, active_connections: set
+):
+    """
+    Handles an individual client connection.
+
+    Args:
+        `c` (socket): The client's socket object.
+
+        `input_queue` (Queue): Queue to store user inputs.
+
+        `continue_running` (Event): Event to control the server running state.
+
+        `active_connections` (set): Set of active client connections.
+
+    Returns:
+        None
+    """
+
     active_connections.add(c)
     is_active = True  # Flag to track the active state of the client connection
     c.settimeout(1)  # Set timeout for client's socket object
@@ -116,59 +152,62 @@ def handle_client(c, input_queue, continue_running, active_connections):
         )
 
 
-def main():
+def setup_server_socket(port: int):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("", port))
+    s.listen(5)
+    return s
+
+
+def close_connections(active_connections: set):
+    for c in active_connections:
+        c.close()
+
+
+def run_server():
     port = 6666
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", port))
-        s.listen(5)
+    s = setup_server_socket(port)
 
-        input_queue = queue.Queue()
-        continue_running = threading.Event()
-        continue_running.set()
+    input_queue = Queue()
+    continue_running = Event()
+    continue_running.set()
 
-        active_connections = set()
+    active_connections = set()
 
-        model = SimpleRNN(input_size=2, hidden_size=20, output_size=1)
-        hidden = model.init_hidden(batch_size=1)
+    model = SimpleRNN(input_size=2, hidden_size=20, output_size=1)
+    hidden = model.init_hidden(batch_size=1)
 
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=4
-        ) as executor:  # 3 clients
-            model_future = executor.submit(
-                run_model_and_print_output, model, hidden, input_queue, continue_running
-            )
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        model_future = executor.submit(
+            run_model_and_print_output, model, hidden, input_queue, continue_running
+        )
 
-            s.settimeout(2)  # Set timeout
-            while True:
-                try:
-                    c, addr = s.accept()
-                    active_connections.add(c)
-                    executor.submit(
-                        handle_client,
-                        c,
-                        input_queue,
-                        continue_running,
-                        active_connections,
-                    )
+        s.settimeout(1)
+        while True:
+            try:
+                c, addr = s.accept()
+                active_connections.add(c)
+                executor.submit(
+                    handle_client,
+                    c,
+                    input_queue,
+                    continue_running,
+                    active_connections,
+                )
 
-                except socket.timeout:
-                    # If a timeout occurs, check if the server should still be running
-                    if not continue_running.isSet() and len(active_connections) == 0:
-                        print("Server stopped due to timeout!")
-                        break
-                except OSError:
-                    print("Server stopped due to an error!")
+            except socket.timeout:
+                if not continue_running.is_set() and len(active_connections) == 0:
+                    print("Server stopped due to timeout!")
                     break
+            except OSError:
+                print("Server stopped due to an error!")
+                break
 
-            # Close all active connections
-            for c in active_connections:
-                c.close()
+        close_connections(active_connections)
+        model_future.result()
 
-            # If the function raised an exception, .result() will re-raise that exception here
-            model_future.result()
-
-        print("Server closed!")
+    print("Server closed!")
 
 
 if __name__ == "__main__":
-    main()
+    run_server()
