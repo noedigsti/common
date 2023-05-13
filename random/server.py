@@ -80,7 +80,12 @@ def receive_input(c, input_queue, continue_running):
     except Exception as e:
         print(f"Exception in receive_input: {e}")
 
+def handle_client(c, input_queue, continue_running, executor):
+    future = executor.submit(receive_input, c, input_queue, continue_running)
 
+    # If the function raised an exception, .result() will re-raise that exception here
+    future.result()
+    
 def main():
     port = 6666
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -91,23 +96,13 @@ def main():
         continue_running = threading.Event()
         continue_running.set()
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor: # Note increased max_workers
+            model_future = executor.submit(run_model_and_print_output, input_queue, continue_running)
+
             while True:
                 try:
                     c, addr = s.accept()
-                    future1 = executor.submit(
-                        receive_input, c, input_queue, continue_running
-                    )
-                    future2 = executor.submit(
-                        run_model_and_print_output, input_queue, continue_running
-                    )
-                    # If the functions raised an exception, .result() will re-raise that exception here
-                    future1.result()
-                    future2.result()
-
-                    if not continue_running.isSet():
-                        print("Server stopped due to client request!")
-                        break
+                    executor.submit(handle_client, c, input_queue, continue_running, executor)
 
                 except socket.timeout:
                     # If a timeout occurs, check if the server should still be running
@@ -117,6 +112,9 @@ def main():
                 except OSError:
                     print("Server stopped due to an error!")
                     break
+
+            # If the function raised an exception, .result() will re-raise that exception here
+            model_future.result()
 
         print("Connection closed!")
 
