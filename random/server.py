@@ -121,15 +121,17 @@ def handle_client(
     """
 
     active_connections.add(c)
-    is_active = True  # Flag to track the active state of the client connection
     c.settimeout(1)  # Set timeout for client's socket object
 
     try:
-        while continue_running.is_set() and is_active:
+        while continue_running.is_set():
             try:
                 user_input = c.recv(1024).decode()
             except socket.timeout:
                 continue
+            except socket.error as e:
+                print(f"Socket error in handle_client: {e}")
+                break
 
             if not user_input:
                 break
@@ -147,9 +149,6 @@ def handle_client(
     finally:
         c.close()
         active_connections.remove(c)
-        is_active = (
-            False  # Set the active state to False when the client connection is closed
-        )
 
 
 def setup_server_socket(port: int):
@@ -205,6 +204,7 @@ def run_server():
 
         close_connections(active_connections)
         model_future.result()
+        s.close()  # Close the server socket
 
     print("Server closed!")
 
