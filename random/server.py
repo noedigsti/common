@@ -1,3 +1,5 @@
+from collections import deque
+import concurrent.futures
 import socket
 import time
 import threading
@@ -23,93 +25,100 @@ class SimpleRNN(nn.Module):
 
 
 def run_model_and_print_output(input_queue, continue_running):
-    model = SimpleRNN(input_size=2, hidden_size=20, output_size=1)
-    hidden = model.init_hidden(batch_size=1)
-    last_input_time = time.time()
+    try:
+        model = SimpleRNN(input_size=2, hidden_size=20, output_size=1)
+        hidden = model.init_hidden(batch_size=1)
+        last_input_time = time.time()
 
-    while continue_running.is_set():
-        user_input = input_queue.get()  # get input
+        while continue_running.is_set():
+            if not input_queue.empty():
+                user_input = input_queue.get()
 
-        if user_input.isdigit():
-            current_time = time.time()
-            time_elapsed = current_time - last_input_time
+                if user_input.isdigit():
+                    current_time = time.time()
+                    time_elapsed = current_time - last_input_time
 
-            while continue_running.is_set() and input_queue.empty():
-                current_time = time.time()
-                time_elapsed = current_time - last_input_time
-                input_tensor = torch.tensor([[[float(user_input), -time_elapsed]]])
-                output, hidden = model(input_tensor, hidden)
-                print(f"Input: {user_input} - Model output: {output.item():.4f}")
-                last_input_time = current_time
-                time.sleep(1 / 20)  # Refresh rate
+                    while continue_running.is_set() and input_queue.empty():
+                        current_time = time.time()
+                        time_elapsed = current_time - last_input_time
+                        input_tensor = torch.tensor(
+                            [[[float(user_input), -time_elapsed]]]
+                        )
+                        output, hidden = model(input_tensor, hidden)
+                        print(
+                            f"Input: {user_input} - Model output: {output.item():.4f}"
+                        )
+                        last_input_time = current_time
+                        time.sleep(1 / 20)  # Refresh rate
 
-        elif user_input == "???":
-            print("???")
-            hidden = model.init_hidden(batch_size=1)
-        elif user_input == "stop":
-            print("Stopping server...")
-            continue_running.clear()
+                elif user_input == "???":
+                    print("???")
+                    hidden = model.init_hidden(batch_size=1)
+                elif user_input == "stop":
+                    print("Stopping server...")
+                    continue_running.clear()
+    except Exception as e:
+        print(f"Exception in run_model_and_print_output: {e}")
 
 
 def receive_input(c, input_queue, continue_running):
-    while continue_running.is_set():
-        user_input = c.recv(1024).decode()
-        if not user_input:
-            break
-        elif user_input == "stop":
-            print("Stopping server...")
-            continue_running.clear()
-            break
-        elif user_input.isdigit():
-            input_queue.put(user_input)
-        else:
-            print(f"Received input {user_input}")
-            input_queue.put("???")
-    c.close()
+    try:
+        while continue_running.is_set():
+            user_input = c.recv(1024).decode()
+            if not user_input:
+                break
+            elif user_input == "stop":
+                print("Stopping server...")
+                continue_running.clear()
+                break
+            elif user_input.isdigit():
+                input_queue.put(user_input)
+            else:
+                print(f"Received input {user_input}")
+                input_queue.put("???")
+        c.close()
+    except Exception as e:
+        print(f"Exception in receive_input: {e}")
 
 
 def main():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     port = 6666
-    s.bind(("", port))
-    s.listen(5)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", port))
+        s.listen(5)
 
-    # Set a timeout for the accept() method
-    s.settimeout(1)
+        input_queue = queue.Queue()
+        continue_running = threading.Event()
+        continue_running.set()
 
-    input_queue = queue.Queue()
-    continue_running = threading.Event()
-    continue_running.set()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            while True:
+                try:
+                    c, addr = s.accept()
+                    future1 = executor.submit(
+                        receive_input, c, input_queue, continue_running
+                    )
+                    future2 = executor.submit(
+                        run_model_and_print_output, input_queue, continue_running
+                    )
+                    # If the functions raised an exception, .result() will re-raise that exception here
+                    future1.result()
+                    future2.result()
 
-    while continue_running.isSet():
-        try:
-            c, addr = s.accept()
-            t1 = threading.Thread(
-                target=receive_input, args=(c, input_queue, continue_running)
-            )
-            t2 = threading.Thread(
-                target=run_model_and_print_output, args=(input_queue, continue_running)
-            )
+                    if not continue_running.isSet():
+                        print("Server stopped due to client request!")
+                        break
 
-            t1.start()
-            t2.start()
+                except socket.timeout:
+                    # If a timeout occurs, check if the server should still be running
+                    if not continue_running.isSet():
+                        print("Server stopped due to timeout!")
+                        break
+                except OSError:
+                    print("Server stopped due to an error!")
+                    break
 
-            # Waiting for the threads to finish
-            t1.join()
-            t2.join()
-        except socket.timeout:
-            # If a timeout occurs, check if the server should still be running
-            if not continue_running.isSet():
-                print("Server stopped due to timeout!")
-                break
-        except OSError:
-            print("Server stopped due to an error!")
-            break
-
-    # Closing the server socket
-    s.close()
-
-    print("Connection closed!")
+        print("Connection closed!")
 
 
 if __name__ == "__main__":
