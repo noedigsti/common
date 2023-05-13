@@ -24,10 +24,8 @@ class SimpleRNN(nn.Module):
         return torch.zeros(1, batch_size, self.hidden_size)
 
 
-def run_model_and_print_output(input_queue, continue_running):
+def run_model_and_print_output(model, hidden, input_queue, continue_running):
     try:
-        model = SimpleRNN(input_size=2, hidden_size=20, output_size=1)
-        hidden = model.init_hidden(batch_size=1)
         last_input_time = time.time()
 
         while continue_running.is_set():
@@ -61,7 +59,7 @@ def run_model_and_print_output(input_queue, continue_running):
         print(f"Exception in run_model_and_print_output: {e}")
 
 
-def receive_input(c, input_queue, continue_running):
+def receive_input(c, input_queue, continue_running, active_connections):
     try:
         while continue_running.is_set():
             user_input = c.recv(1024).decode()
@@ -77,15 +75,47 @@ def receive_input(c, input_queue, continue_running):
                 print(f"Received input {user_input}")
                 input_queue.put("???")
         c.close()
+        active_connections.remove(c)
     except Exception as e:
         print(f"Exception in receive_input: {e}")
+    finally:
+        c.close()
+        active_connections.remove(c)
 
-def handle_client(c, input_queue, continue_running, executor):
-    future = executor.submit(receive_input, c, input_queue, continue_running)
 
-    # If the function raised an exception, .result() will re-raise that exception here
-    future.result()
-    
+def handle_client(c, input_queue, continue_running, active_connections):
+    active_connections.add(c)
+    is_active = True  # Flag to track the active state of the client connection
+    c.settimeout(1)  # Set timeout for client's socket object
+
+    try:
+        while continue_running.is_set() and is_active:
+            try:
+                user_input = c.recv(1024).decode()
+            except socket.timeout:
+                continue
+
+            if not user_input:
+                break
+            elif user_input == "stop":
+                print("Stopping server...")
+                continue_running.clear()
+                break
+            elif user_input.isdigit():
+                input_queue.put(user_input)
+            else:
+                print(f"Received input {user_input}")
+                input_queue.put("???")
+    except Exception as e:
+        print(f"Exception in handle_client: {e}")
+    finally:
+        c.close()
+        active_connections.remove(c)
+        is_active = (
+            False  # Set the active state to False when the client connection is closed
+        )
+
+
 def main():
     port = 6666
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -96,27 +126,48 @@ def main():
         continue_running = threading.Event()
         continue_running.set()
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor: # Note increased max_workers
-            model_future = executor.submit(run_model_and_print_output, input_queue, continue_running)
+        active_connections = set()
 
+        model = SimpleRNN(input_size=2, hidden_size=20, output_size=1)
+        hidden = model.init_hidden(batch_size=1)
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=4
+        ) as executor:  # 3 clients
+            model_future = executor.submit(
+                run_model_and_print_output, model, hidden, input_queue, continue_running
+            )
+
+            s.settimeout(2)  # Set timeout
             while True:
                 try:
                     c, addr = s.accept()
-                    executor.submit(handle_client, c, input_queue, continue_running, executor)
+                    active_connections.add(c)
+                    executor.submit(
+                        handle_client,
+                        c,
+                        input_queue,
+                        continue_running,
+                        active_connections,
+                    )
 
                 except socket.timeout:
                     # If a timeout occurs, check if the server should still be running
-                    if not continue_running.isSet():
+                    if not continue_running.isSet() and len(active_connections) == 0:
                         print("Server stopped due to timeout!")
                         break
                 except OSError:
                     print("Server stopped due to an error!")
                     break
 
+            # Close all active connections
+            for c in active_connections:
+                c.close()
+
             # If the function raised an exception, .result() will re-raise that exception here
             model_future.result()
 
-        print("Connection closed!")
+        print("Server closed!")
 
 
 if __name__ == "__main__":
