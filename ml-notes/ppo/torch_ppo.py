@@ -32,12 +32,18 @@ class PPOMemory:
 
         Returns:
         --------
-            np.array: states in a numpy array
-            np.array: actions in a numpy array
+            np.array: ``states`` in a numpy array
+
+            np.array: ``actions`` in a numpy array
+
             np.array: log probabilities in a numpy array
+
             np.array: values in a numpy array
+
             np.array: rewards in a numpy array
+
             np.array: done flags in a numpy array
+
             list: batches of indices indicating the start of each batch
         """
 
@@ -91,6 +97,7 @@ class ActorNetwork(nn.Module):
     ):
         super(ActorNetwork, self).__init__()
 
+        os.makedirs(checkpoint_dir, exist_ok=True)
         self.checkpoint_file = os.path.join(checkpoint_dir, "actor_torch_ppo")
         self.actor = nn.Sequential(
             nn.Linear(*input_dims, fc1_dims),
@@ -111,11 +118,11 @@ class ActorNetwork(nn.Module):
         return dist  # Return the distribution
 
     def save_checkpoint(self):
-        print("... saving checkpoint ...")
+        print("... saving actor checkpoint ...")
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):
-        print("... loading checkpoint ...")
+        print("... loading actor checkpoint ...")
         self.load_state_dict(T.load(self.checkpoint_file))
 
 
@@ -130,6 +137,7 @@ class CriticNetwork(nn.Module):
     ):
         super(CriticNetwork, self).__init__()
 
+        os.makedirs(checkpoint_dir, exist_ok=True)
         self.checkpoint_file = os.path.join(checkpoint_dir, "critic_torch_ppo")
 
         self.critic = nn.Sequential(
@@ -149,11 +157,11 @@ class CriticNetwork(nn.Module):
         return value  # (batch_size, 1)
 
     def save_checkpoint(self):
-        print("... saving checkpoint ...")
+        print("... saving critic checkpoint ...")
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):
-        print("... loading checkpoint ...")
+        print("... loading critic checkpoint ...")
         self.load_state_dict(T.load(self.checkpoint_file))
 
 

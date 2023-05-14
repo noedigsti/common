@@ -1,5 +1,7 @@
 ## Proximal Policy Optimization (PPO)
 
+Following [Reinforcement Learning Course: Intro to Advanced Actor Critic Methods - YouTube](https://www.youtube.com/watch?v=K2qjAixgLqk)
+
 ### 1. Introduction
 
 In Actor-Critic, sometimes the performance could fall off a cliff. The agent would be doing really well for a while and an update to the neural network would cause the agent to lose its understanding of playing the game. This happens because Actor-Critic methods are sensitive to perturbations. The reason being that a small change in the policy can lead to a large jump in policy space.
