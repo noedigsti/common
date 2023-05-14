@@ -26,6 +26,12 @@
 
 `Linear algebra`: deals with vectors, matrices, and operations like addition, subtraction, and multiplication. It is used to solve linear equations and has applications in various fields.
 
+`Entropy`: is a measure of uncertainty or randomness in data or probability distributions. It quantifies the amount of information or surprise in a random variable. High entropy means more uncertainty, low entropy means less uncertainty.
+
 `Cross-entropy`: is a loss function that compares predicted probabilities with true probabilities, quantifying the dissimilarity between them. It calculates the average information required to describe the true distribution using the predicted distribution. Minimizing cross-entropy improves the accuracy of predictions in classification tasks.
 
 An `episode` is a single sequence of interactions between an agent and the environment, representing a complete trajectory from the initial state to a terminal state.
+
+`Policy`: is a function that maps states to actions. It is the agent's behavior, and it is what the agent uses to decide what action to take in a given state.
+
+`Markov Decision Process (MDP)`: is a mathematical framework for modeling decision-making problems where outcomes are partly random and partly under the control of the decision-maker. It is a discrete-time stochastic control process with discrete states and actions, and the assumption that the next state and reward only depend on the current state and action.
