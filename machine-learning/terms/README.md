@@ -28,7 +28,9 @@
 
 `Entropy`: is a measure of uncertainty or randomness in data or probability distributions. It quantifies the amount of information or surprise in a random variable. High entropy means more uncertainty, low entropy means less uncertainty.
 
-`Cross-entropy`: is a loss function that compares predicted probabilities with true probabilities, quantifying the dissimilarity between them. It calculates the average information required to describe the true distribution using the predicted distribution. Minimizing cross-entropy improves the accuracy of predictions in classification tasks.
+`Cross-entropy Loss` or `Negative Log-likelihood Loss`: is a loss function that compares predicted probabilities with true probabilities, quantifying the dissimilarity between them. It calculates the _average_/_mean_ information required to describe the true distribution using the predicted distribution. Minimizing cross-entropy improves the accuracy of predictions in classification tasks.
+
+`Kullback-Leibler (KL) divergence`: is a measure of how one probability distribution differs from another. It is the average difference between the log-likelihood of the first distribution and the log-likelihood of the second distribution. KL divergence is always non-negative and zero only when the two distributions are identical.
 
 An `episode` is a single sequence of interactions between an agent and the environment, representing a complete trajectory from the initial state to a terminal state.
 
