@@ -8,6 +8,8 @@
 
 `Locally weighted regression (LWR)`: is a non-parametric regression algorithm that predicts by considering nearby data points with varying weights based on their proximity. It adapts to local data characteristics and captures complex relationships.
 
+`Stochastic`: means using random mini-batches of training examples for computing gradients and updating parameters, making it more efficient but introducing some randomness and noise into the process.
+
 `Stochastic gradient descent (SGD)`: Optimization algorithm that computes gradients on randomly selected mini-batches of data, allowing for efficient and faster convergence in machine learning models.
 
 `Affine transformation`: is a geometric mapping that preserves parallel lines and ratios of distances through a combination of scaling, rotation, shearing, and translation operations.
@@ -36,4 +38,4 @@ An `episode` is a single sequence of interactions between an agent and the envir
 
 `Policy`: is a function that maps states to actions. It is the agent's behavior, and it is what the agent uses to decide what action to take in a given state.
 
-`Markov Decision Process (MDP)`: is a mathematical framework for modeling decision-making problems where outcomes are partly random and partly under the control of the decision-maker. It is a discrete-time stochastic control process with discrete states and actions, and the assumption that the next state and reward only depend on the current state and action.
+`Markov Decision Process (MDP)`: is a mathematical framework for modeling decision-making problems where outcomes are _partly random_ and _partly under the control_ of the decision-maker. It is a discrete-time stochastic control process with discrete states and actions, and the assumption that _the next state and reward only depend on the current state and action_.
