@@ -32,6 +32,8 @@
 
 [Understanding LSTM Networks -- colah's blog](http://colah.github.io/posts/2015-08-Understanding-LSTMs/#lstm-networks)
 
+[nicklashansen/rnn_lstm_from_scratch: How to build RNNs and LSTMs from scratch with NumPy.](https://github.com/nicklashansen/rnn_lstm_from_scratch)
+
 ### Seq2Seq
 
 [bentrevett/pytorch-seq2seq: Tutorials on implementing a few sequence-to-sequence (seq2seq) models with PyTorch and TorchText.](https://github.com/bentrevett/pytorch-seq2seq)
@@ -50,6 +52,7 @@
 
 [huggingface/pytorch-image-models: PyTorch image models, scripts, pretrained weights -- ResNet, ResNeXT, EfficientNet, EfficientNetV2, NFNet, Vision Transformer, MixNet, MobileNet-V3/V2, RegNet, DPN, CSPNet, and more](https://github.com/huggingface/pytorch-image-models)
 
+[DeepLearningDTU/02456-deep-learning-with-PyTorch: Exercises and supplementary material for the deep learning course 02456 using PyTorch.](https://github.com/DeepLearningDTU/02456-deep-learning-with-PyTorch)
 # Reinforcement Learning
 
 ### RL
