@@ -39,3 +39,5 @@ An `episode` is a single sequence of interactions between an agent and the envir
 `Policy`: is a function that maps states to actions. It is the agent's behavior, and it is what the agent uses to decide what action to take in a given state.
 
 `Markov Decision Process (MDP)`: is a mathematical framework for modeling decision-making problems where outcomes are _partly random_ and _partly under the control_ of the decision-maker. It is a discrete-time stochastic control process with discrete states and actions, and the assumption that _the next state and reward only depend on the current state and action_.
+
+`Online Learning`: can be used to train systems on huge datasets that cannot fit in one machine's main memory (out-of-core learning). It is also useful for training on data that is continuously generated at a fast rate (real-time learning). It is also known as incremental learning. If bad data is fed to the system, it will learn from it and its performance will degrade.
