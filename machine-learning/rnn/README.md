@@ -17,3 +17,7 @@
 9. **Sequence Length Handling:** Techniques such as mini-batching, truncation, and padding are used to handle sequences of varying lengths.
 
 10. **Deep and Stacked RNNs:** Deep RNNs with multiple layers and stacked RNNs allow for increased modeling capacity and hierarchical feature extraction.
+
+### REFERENCES
+
+1. https://youtu.be/ySEx_Bqxvvo?t=725

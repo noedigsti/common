@@ -4,6 +4,7 @@ import win32gui, win32ui, win32con, win32api
 import time
 import sys
 import matplotlib.pyplot as plt
+import threading
 
 # pip install opencv-python pyautogui pywin32
 
@@ -14,6 +15,54 @@ def get_screen_dimensions():
     )
 
 
+def smooth_move(x2, y2, speed=0.001, step_size=70):
+    """
+    Utility function to move the mouse smoothly to a target position
+
+    Default:
+        speed = 0.001
+        step_size = 70
+    """
+    x1, y1 = win32api.GetCursorPos()  # get current position
+    mouse_down()
+    dx = x2 - x1  # calculate horizontal distance to cover
+    dy = y2 - y1  # calculate vertical distance to cover
+    steps = (
+        max(abs(dx), abs(dy)) // step_size
+    )  # calculate number of steps, considering the step size
+
+    if steps == 0:  # if the cursor is already at the target position
+        return
+
+    for i in range(steps):
+        x = x1 + (dx * i) // steps  # calculate intermediate x
+        y = y1 + (dy * i) // steps  # calculate intermediate y
+        win32api.SetCursorPos((x, y))  # move the cursor to the intermediate position
+        time.sleep(speed)  # wait a small amount of time before next step
+
+    win32api.SetCursorPos(
+        (x2, y2)
+    )  # ensure cursor ends up exactly at the target position
+    mouse_up()
+
+
+def move_mouse_to_center_screen():
+    """
+    Utility function to move the mouse to the center of the screen
+    """
+    while True:
+        print(f"Mouse position: {win32api.GetCursorPos()}")
+        screen_width = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+        screen_height = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+
+        center_x = screen_width // 2
+        center_y = screen_height // 2
+
+        win32api.SetCursorPos((center_x, center_y))
+
+        time.sleep(3)
+
+
 def rotate_image(image, angle=0.0, center=None, scale=1.0):
     (h, w) = image.shape[:2]
     if center is None:
@@ -22,7 +71,25 @@ def rotate_image(image, angle=0.0, center=None, scale=1.0):
     return cv.warpAffine(image, rotMat, (w, h))
 
 
+def mouse_down():
+    """
+    Utility function to press the left mouse button down
+    """
+    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)  # press left button down
+
+
+def mouse_up():
+    """
+    Utility function to release the left mouse button
+    """
+    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)  # release left button
+
+
 class Vision:
+    """
+    TODO: A way to set the regions of interest
+    """
+
     def __init__(self, hwnd):  # TODO: handle exceptions
         self.hwnd = hwnd
         self.wDC = win32gui.GetWindowDC(self.hwnd)
@@ -34,9 +101,34 @@ class Vision:
         self.cDC.DeleteDC()
         win32gui.ReleaseDC(self.hwnd, self.wDC)
 
-    def _window_capture(self, w=1280, h=720):
-        border_offset_top = 38
-        border_offset_left = 8
+    def get_current_window_position(self):
+        """
+        Utility function to get the current position of the window
+        """
+        left, top, right, bottom = win32gui.GetWindowRect(self.hwnd)
+        return left, top, right, bottom
+
+    def move_mouse_to_center_window(self):
+        """
+        Utility function to move the mouse to the center of the window
+
+        TODO: Add paddings for the window title bar and the window border
+        TODO: Implement a region inside the window to bound the mouse movement, so that the mouse move to the center of the region instead
+        """
+        while True:
+            left, top, right, bottom = win32gui.GetWindowRect(self.hwnd)
+            center_x = (left + right) // 2
+            center_y = (top + bottom) // 2
+
+            smooth_move(center_x, center_y)
+            time.sleep(3)
+
+    def _window_capture(self, w=1280, h=720, offset_top=38, offset_left=8):
+        border_offset_top = offset_top
+        border_offset_left = offset_left
+
+        left, top, right, bottom = self.get_current_window_position()
+        print(f"Target window position: {left}, {top}, {right}, {bottom}")
 
         dataBitMap = win32ui.CreateBitmap()
         dataBitMap.CreateCompatibleBitmap(self.dcObj, w, h)
@@ -58,11 +150,18 @@ class Vision:
 
         return img
 
-    def capture(self, mode="continuous", width=1920, height=1080, color_mode="rgb"):
+    def capture(
+        self, mode="continuous", width=1920, height=1080, color_mode="rgb", **kwargs
+    ):
         cv.namedWindow("Window Capture", cv.WINDOW_NORMAL)
 
         if mode == "one":
-            screenshot = self._window_capture(w=width, h=height)
+            screenshot = self._window_capture(
+                w=width,
+                h=height,
+                offset_top=kwargs["offset_top"],
+                offset_left=kwargs["offset_left"],
+            )
             screenshot = cv.cvtColor(screenshot, cv.COLOR_RGBA2RGB)
             if color_mode == "gray":
                 screenshot = cv.cvtColor(screenshot, cv.COLOR_RGB2GRAY)
@@ -72,8 +171,22 @@ class Vision:
         elif mode == "continuous":
             loop_time = cv.getTickCount()
 
+            # Starting a new thread for the mouse movement function
+            # so that it doesn't block the main thread
+            move_mouse_thread = threading.Thread(
+                target=self.move_mouse_to_center_window
+            )
+            move_mouse_thread.daemon = True
+            move_mouse_thread.start()
+            # Also, it's a daemon thread so that it stops when the main thread stops
+
             while True:
-                screenshot = self._window_capture(w=width, h=height)
+                screenshot = self._window_capture(
+                    w=width,
+                    h=height,
+                    offset_top=kwargs["offset_top"],
+                    offset_left=kwargs["offset_left"],
+                )
                 screenshot = cv.cvtColor(screenshot, cv.COLOR_RGBA2RGB)
                 if color_mode == "gray":
                     screenshot = cv.cvtColor(screenshot, cv.COLOR_RGB2GRAY)
@@ -81,6 +194,10 @@ class Vision:
                 loop_time = self._display_fps(screenshot, loop_time)
 
                 if cv.waitKey(1) & 0xFF == ord("q"):
+                    """
+                    Press q to quit the program
+                    TODO: This doesn't work if the view window is not in focus
+                    """
                     print("\n")
                     break
 
